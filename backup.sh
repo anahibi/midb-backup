@@ -51,7 +51,7 @@ S3_BASE_PATH="s3://$SERVICE_NAME/$(date +%Y-%m-%d)"
 log "Starting backup for $SERVICE_NAME"
 
 # PostgreSQLバックアップ
-if ! /usr/bin/pg_dump -Fc -Z 9 -U "$POSTGRESQL_USER" -d "$POSTGRESQL_DB" > "$BACKUP_SQL_FILE"; then
+if ! /usr/bin/pg_dump -Fc -U "$POSTGRESQL_USER" -d "$POSTGRESQL_DB" > "$BACKUP_SQL_FILE"; then
   error_exit "Error: Failed to dump PostgreSQL database $POSTGRESQL_DB"
 fi
 if ! /usr/bin/s3cmd -c "$S3CFG_FILE" put "$BACKUP_SQL_FILE" "$S3_BASE_PATH/backup-${SERVICE_NAME}-${TIMESTAMP}.dump"; then
