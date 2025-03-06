@@ -24,8 +24,7 @@ error_exit() {
 check_env() {
   local var_name="$1"
   if [ -z "${!var_name}" ]; then
-    echo "Error: Environment variable $var_name is not set." >&2
-    exit 1
+    error_exit "Environment variable $var_name is not set."
   fi
 }
 
@@ -38,7 +37,7 @@ check_env "DISCORD_WEBHOOK_URL"
 
 # 設定
 S3CFG_FILE="${S3CFG_FILE:-/root/.s3cfg}"
-[ ! -f "$S3CFG_FILE" ] && { echo "Error: S3 config file $S3CFG_FILE not found." >&2; exit 1; }
+[ ! -f "$S3CFG_FILE" ] && { error_exit "S3 config file $S3CFG_FILE not found."; }
 
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 TEMP_DIR=$(mktemp -d "/tmp/backup-${SERVICE_NAME}-XXXXXXXX")
@@ -52,18 +51,18 @@ log "Starting backup for $SERVICE_NAME"
 
 # PostgreSQLバックアップ
 if ! /usr/bin/pg_dump -Fc -U "$POSTGRESQL_USER" -d "$POSTGRESQL_DB" > "$BACKUP_SQL_FILE"; then
-  error_exit "Error: Failed to dump PostgreSQL database $POSTGRESQL_DB"
+  error_exit "Failed to dump PostgreSQL database $POSTGRESQL_DB"
 fi
 if ! /usr/bin/s3cmd -c "$S3CFG_FILE" put "$BACKUP_SQL_FILE" "$S3_BASE_PATH/backup-${SERVICE_NAME}-${TIMESTAMP}.dump"; then
-  error_exit "Error: Failed to upload PostgreSQL backup to S3"
+  error_exit "Failed to upload PostgreSQL backup to S3"
 fi
 
 # Redisバックアップ
 if ! cp -p "$REDIS_DUMP_PATH" "$BACKUP_REDIS_FILE"; then
-  error_exit "Error: Failed to copy Redis dump from $REDIS_DUMP_PATH"
+  error_exit "Failed to copy Redis dump from $REDIS_DUMP_PATH"
 fi
 if ! /usr/bin/s3cmd -c "$S3CFG_FILE" put "$BACKUP_REDIS_FILE" "$S3_BASE_PATH/backup-${SERVICE_NAME}-${TIMESTAMP}.rdb"; then
-  error_exit "Error: Failed to upload Redis backup to S3"
+  error_exit "Failed to upload Redis backup to S3"
 fi
 
 log "Backup completed successfully"
