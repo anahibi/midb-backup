@@ -8,15 +8,21 @@ log() {
 
 send_discord_notification() {
   local message="$1"
+  local color="$2"
   local webhook_url="$DISCORD_WEBHOOK_URL"
   if [ -n "$webhook_url" ]; then
-    curl -H "Content-Type: application/json" -X POST -d "{\"content\": \"$message\"}" "$webhook_url"
+    curl -H "Content-Type: application/json" -X POST -d "{
+      \"embeds\": [{
+        \"description\": \"$message\",
+        \"color\": $color
+      }]
+    }" "$webhook_url"
   fi
 }
 
 error_exit() {
   log "Error: $1"
-  send_discord_notification "Error: $1"
+  send_discord_notification "Error: $1" 15158332
   exit 1
 }
 
@@ -37,7 +43,9 @@ check_env "DISCORD_WEBHOOK_URL"
 
 # 設定
 S3CFG_FILE="${S3CFG_FILE:-/root/.s3cfg}"
-[ ! -f "$S3CFG_FILE" ] && { error_exit "S3 config file $S3CFG_FILE not found."; }
+if [ ! -f "$S3CFG_FILE" ]; then
+  error_exit "S3 config file $S3CFG_FILE not found.";
+fi
 
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 TEMP_DIR=$(mktemp -d "/tmp/backup-${SERVICE_NAME}-XXXXXXXX")
@@ -66,4 +74,6 @@ if ! /usr/bin/s3cmd -c "$S3CFG_FILE" put "$BACKUP_REDIS_FILE" "$S3_BASE_PATH/bac
 fi
 
 log "Backup completed successfully"
-send_discord_notification "Backup for $SERVICE_NAME completed successfully"
+if [ "${NOTIFY_ON_ERROR:-false}" != "true" ]; then
+  send_discord_notification "Backup for $SERVICE_NAME completed successfully" 3066993
+fi
