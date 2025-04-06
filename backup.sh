@@ -63,7 +63,7 @@ if ! /usr/bin/pg_dump -Fc -U "$POSTGRESQL_USER" -d "$POSTGRESQL_DB" > "$BACKUP_S
   error_exit "Failed to dump PostgreSQL database $POSTGRESQL_DB"
 fi
 #opensslで暗号化
-if ! openssl enc -aes-256-cbc -salt -in "$BACKUP_SQL_FILE" -out "${BACKUP_SQL_FILE}.enc" -k "$ENCRYPTION_KEY"; then
+if ! openssl enc -aes-256-cbc -salt -pbkdf2 -in "$BACKUP_SQL_FILE" -out "${BACKUP_SQL_FILE}.enc" -k "$ENCRYPTION_KEY"; then
   error_exit "Failed to encrypt PostgreSQL backup"
 fi
 if ! /usr/bin/s3cmd -c "$S3CFG_FILE" put "${BACKUP_SQL_FILE}.enc" "$S3_BASE_PATH/backup-${SERVICE_NAME}-${TIMESTAMP}.dump"; then
@@ -75,7 +75,7 @@ if ! cp -p "$REDIS_DUMP_PATH" "$BACKUP_REDIS_FILE"; then
   error_exit "Failed to copy Redis dump from $REDIS_DUMP_PATH"
 fi
 #opensslで暗号化
-if ! openssl enc -aes-256-cbc -salt -in "$BACKUP_REDIS_FILE" -out "${BACKUP_REDIS_FILE}.enc" -k "$ENCRYPTION_KEY"; then
+if ! openssl enc -aes-256-cbc -salt -pbkdf2 -in "$BACKUP_REDIS_FILE" -out "${BACKUP_REDIS_FILE}.enc" -k "$ENCRYPTION_KEY"; then
   error_exit "Failed to encrypt Redis backup"
 fi
 if ! /usr/bin/s3cmd -c "$S3CFG_FILE" put "${BACKUP_REDIS_FILE}.enc" "$S3_BASE_PATH/backup-${SERVICE_NAME}-${TIMESTAMP}.rdb"; then
