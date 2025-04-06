@@ -40,6 +40,7 @@ check_env "PGPASSWORD"
 check_env "POSTGRESQL_DB"
 check_env "REDIS_DUMP_PATH"
 check_env "DISCORD_WEBHOOK_URL"
+check_env "ENCRYPTION_KEY"
 
 # 設定
 S3CFG_FILE="${S3CFG_FILE:-/root/.s3cfg}"
@@ -61,7 +62,11 @@ log "Starting backup for $SERVICE_NAME"
 if ! /usr/bin/pg_dump -Fc -U "$POSTGRESQL_USER" -d "$POSTGRESQL_DB" > "$BACKUP_SQL_FILE"; then
   error_exit "Failed to dump PostgreSQL database $POSTGRESQL_DB"
 fi
-if ! /usr/bin/s3cmd -c "$S3CFG_FILE" put "$BACKUP_SQL_FILE" "$S3_BASE_PATH/backup-${SERVICE_NAME}-${TIMESTAMP}.dump"; then
+#opensslで暗号化
+if ! openssl enc -aes-256-cbc -salt -pbkdf2 -in "$BACKUP_SQL_FILE" -out "${BACKUP_SQL_FILE}.enc" -k "$ENCRYPTION_KEY"; then
+  error_exit "Failed to encrypt PostgreSQL backup"
+fi
+if ! /usr/bin/s3cmd -c "$S3CFG_FILE" put "${BACKUP_SQL_FILE}.enc" "$S3_BASE_PATH/backup-${SERVICE_NAME}-${TIMESTAMP}.dump"; then
   error_exit "Failed to upload PostgreSQL backup to S3"
 fi
 
@@ -69,11 +74,16 @@ fi
 if ! cp -p "$REDIS_DUMP_PATH" "$BACKUP_REDIS_FILE"; then
   error_exit "Failed to copy Redis dump from $REDIS_DUMP_PATH"
 fi
-if ! /usr/bin/s3cmd -c "$S3CFG_FILE" put "$BACKUP_REDIS_FILE" "$S3_BASE_PATH/backup-${SERVICE_NAME}-${TIMESTAMP}.rdb"; then
+#opensslで暗号化
+if ! openssl enc -aes-256-cbc -salt -pbkdf2 -in "$BACKUP_REDIS_FILE" -out "${BACKUP_REDIS_FILE}.enc" -k "$ENCRYPTION_KEY"; then
+  error_exit "Failed to encrypt Redis backup"
+fi
+if ! /usr/bin/s3cmd -c "$S3CFG_FILE" put "${BACKUP_REDIS_FILE}.enc" "$S3_BASE_PATH/backup-${SERVICE_NAME}-${TIMESTAMP}.rdb"; then
   error_exit "Failed to upload Redis backup to S3"
 fi
 
 log "Backup completed successfully"
-if [ "${NOTIFY_ON_ERROR:-false}" != "true" ]; then
+# NOTIFY_ON_ERRORがtrueなら、成功通知しない。
+if [ "${NOTIFY_ON_ERROR:-false}" = "false" ]; then
   send_discord_notification "Backup for $SERVICE_NAME completed successfully" 3066993
 fi
