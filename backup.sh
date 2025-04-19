@@ -58,6 +58,12 @@ S3_BASE_PATH="s3://$SERVICE_NAME/$(date +%Y-%m-%d)"
 
 log "Starting backup for $SERVICE_NAME"
 
+# PostgreSQLのvacuum
+if [ "${ENABLE_VACCUM:-false}" = "true" ]; then
+  if ! /usr/bin/psql -U "$POSTGRESQL_USER" -d "$POSTGRESQL_DB" -c "VACUUM ANALYZE;" > /dev/null; then
+    error_exit "Failed to vacuum PostgreSQL database $POSTGRESQL_DB"
+  fi
+fi
 # PostgreSQLバックアップ
 if ! /usr/bin/pg_dump -Fc -U "$POSTGRESQL_USER" -d "$POSTGRESQL_DB" > "$BACKUP_SQL_FILE"; then
   error_exit "Failed to dump PostgreSQL database $POSTGRESQL_DB"
